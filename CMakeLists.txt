@@ -16,7 +16,7 @@ FetchContent_MakeAvailable(googletest)
 
 add_executable(app ./main.cpp)
 
-# enable_testing()
-# add_executable(tests ./tests/tests.cpp)
-# target_link_libraries(tests gtest_main)
-# add_test(NAME Lab_5_Test COMMAND tests)
+enable_testing()
+add_executable(tests ./tests/tests.cpp)
+target_link_libraries(tests gtest_main)
+add_test(NAME Lab_5_Test COMMAND tests)
