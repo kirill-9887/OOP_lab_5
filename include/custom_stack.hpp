@@ -10,12 +10,12 @@ class CustomStackIterator
 {
 private:
     
-    StackType* _stack_ptr;
+    const StackType* _stack_ptr;
     std::size_t _current_index;
 
 public:
 
-    CustomStackIterator(StackType *stack_ptr, std::size_t index):
+    CustomStackIterator(const StackType *stack_ptr, std::size_t index):
         _stack_ptr(stack_ptr), _current_index(index) {
     }
     CustomStackIterator(const CustomStackIterator& other) = default;
@@ -26,7 +26,7 @@ public:
 
 public:
 
-    typename StackType::item_type operator*() {
+    typename StackType::item_type operator*() const {
         if (_current_index >= (*_stack_ptr).size()) {
             throw std::out_of_range("Stack iterator is out of range");
         }
@@ -53,6 +53,7 @@ public:
     }
 };
 
+
 template <typename T, typename allocator_type>
 requires std::is_default_constructible_v<T> && 
          std::is_same_v<allocator_type, std::pmr::polymorphic_allocator<T>>
@@ -60,18 +61,6 @@ class CustomStack
 {
     template<typename A>
     friend class CustomStackIterator;
-
-private:
-
-    struct PolymorphicDeleter {
-        void operator()(T* ptr) const {
-        }
-    };
-    
-    allocator_type _polymorphic_allocator;
-    std::unique_ptr<T, PolymorphicDeleter> _data_ptr;
-    std::size_t _capacity;
-    std::size_t _size{0};
 
 private:
 
@@ -89,6 +78,19 @@ private:
         }
     }
 
+    struct PolymorphicDeleter {
+        void operator()(T* ptr) const {
+            // The memory is released through the allocator
+        }
+    };
+    
+    allocator_type _polymorphic_allocator;
+    std::unique_ptr<T, PolymorphicDeleter> _data_ptr;
+    std::size_t _capacity;
+    std::size_t _size{0};
+    std::size_t INITIAL_CAPACITY{1};
+    int EXTENSION_COEF{2};
+
 public:
 
     using item_type = T;
@@ -105,16 +107,17 @@ public:
         _data_ptr = std::unique_ptr<T, PolymorphicDeleter>(raw_ptr, PolymorphicDeleter{});
     }
 
+    CustomStack(allocator_type alloc = {}) :
+        CustomStack::CustomStack(INITIAL_CAPACITY, alloc) {
+    }
+
     CustomStack(const CustomStack<T, allocator_type>& other, allocator_type alloc = {}) :
         _polymorphic_allocator(alloc),
         _capacity(other._capacity),
         _size(other._size)
     {
         T* raw_ptr = _polymorphic_allocator.allocate(other._capacity);
-        for (std::size_t element_index = 0; element_index < other._capacity; ++element_index) {
-            _polymorphic_allocator.construct(raw_ptr + element_index);
-        }
-        std::copy(other._data_ptr.get(), other._data_ptr.get() + other._capacity, raw_ptr);
+        std::uninitialized_copy(other._data_ptr.get(), other._data_ptr.get() + other._capacity, raw_ptr);
         _data_ptr = std::unique_ptr<T, PolymorphicDeleter>(raw_ptr, PolymorphicDeleter{});
     }
 
@@ -144,10 +147,7 @@ public:
             _capacity = other._capacity;
             _size = other._size;
             T* raw_ptr = _polymorphic_allocator.allocate(other._capacity);
-            for (std::size_t element_index = 0; element_index < other._capacity; ++element_index) {
-                _polymorphic_allocator.construct(raw_ptr + element_index);
-            }
-            std::move(other._data_ptr.get(), other._data_ptr.get() + other._capacity, raw_ptr);
+            std::uninitialized_move(other._data_ptr.get(), other._data_ptr.get() + other._capacity, raw_ptr);
             _data_ptr = std::unique_ptr<T, PolymorphicDeleter>(raw_ptr, PolymorphicDeleter{});
             other._size = 0;
         }
@@ -156,6 +156,25 @@ public:
 
     virtual ~CustomStack() {
         free_data();
+    }
+
+private:
+
+    void __extend_capacity() {
+        std::size_t new_capacity{_capacity * EXTENSION_COEF};
+        T* raw_ptr = _polymorphic_allocator.allocate(new_capacity);
+        try {
+            for (std::size_t element_index = _size; element_index < new_capacity; ++element_index) {
+                _polymorphic_allocator.construct(raw_ptr + element_index);
+            }
+        } catch (...) {
+            _polymorphic_allocator.deallocate(raw_ptr, new_capacity);
+            throw;
+        }
+        std::uninitialized_move(_data_ptr.get(), _data_ptr.get() + _size, raw_ptr);
+        free_data();
+        _data_ptr = std::unique_ptr<T, PolymorphicDeleter>(raw_ptr, PolymorphicDeleter{});
+        _capacity = new_capacity;
     }
 
 public:
@@ -170,7 +189,7 @@ public:
 
     void push(const T& item) {
         if (_size == _capacity) {
-            throw std::out_of_range("Stack overflow");
+            __extend_capacity();
         }
         _data_ptr.get()[_size] = item;
         ++_size;
@@ -178,7 +197,7 @@ public:
 
     void push(T&& item) {
         if (_size == _capacity) {
-            throw std::out_of_range("Stack overflow");
+            __extend_capacity();
         }
         _data_ptr.get()[_size] = std::move(item);
         ++_size;

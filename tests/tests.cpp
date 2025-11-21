@@ -50,7 +50,7 @@ TEST(StackTest, IntItemType) {
     for (std::size_t i{0}; i < capacity; ++i) {
         EXPECT_NO_THROW(stack.push(static_cast<int>(i)));
     }
-    EXPECT_ANY_THROW(stack.push(10));
+    EXPECT_NO_THROW(stack.push(10));
 }
 
 TEST(StackTest, StructureItemType) {
@@ -90,7 +90,7 @@ TEST(StackTest, StructureItemType) {
     for (std::size_t i{0}; i < capacity; ++i) {
         EXPECT_NO_THROW(stack.push({static_cast<int>(i), static_cast<int>(i)}));
     }
-    EXPECT_ANY_THROW(stack.push({10, 10}));
+    EXPECT_NO_THROW(stack.push({10, 10}));
 }
 
 TEST(StackTest, CopyConstructor) {

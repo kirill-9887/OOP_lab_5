@@ -35,8 +35,11 @@ public:
 private:
 
     void* do_allocate(std::size_t bytes, std::size_t alignment) override {
-        std::cout << "TRY: Allocation: size: " << bytes << " bytes" << std::endl;
         std::lock_guard<std::mutex> lock(_mutex);
+        // std::cout << "TRY: Allocation: size: " << bytes << " bytes" << std::endl;
+        if (bytes == 0) {
+            bytes = 1;
+        }
         std::size_t allocation_offset{0};
         std::size_t index{0};
         for (const MemoryBlock& used_block : _used_blocks) {
@@ -51,7 +54,7 @@ private:
                     allocation_offset,
                     bytes
                 );
-                std::cout << "Allocation: offset " << allocation_offset << ", size " << bytes << " bytes" << std::endl;
+                // std::cout << "Allocation: offset " << allocation_offset << ", size " << bytes << " bytes" << std::endl;
                 return _buffer + allocation_offset;
             }
             allocation_offset = used_block.offset + used_block.size;
@@ -61,8 +64,11 @@ private:
     }
 
     void do_deallocate(void* ptr, std::size_t bytes, std::size_t alignment) override {
-        std::cout << "TRY: Free: address " << ptr << ", size " << bytes << " bytes" << std::endl;
         std::lock_guard<std::mutex> lock(_mutex);
+        // std::cout << "TRY: Free: address " << ptr << ", size " << bytes << " bytes" << std::endl;
+        if (bytes == 0) {
+            bytes = 1;
+        }
         std::size_t a{0};
         std::size_t b{_used_blocks.size() - 2};
         while (a <= b) {
@@ -72,7 +78,7 @@ private:
                 if (_used_blocks[k].size != bytes) {
                     throw std::logic_error("An attempt to free an incorrectly sized block.");
                 }
-                std::cout << "Free: address " << ptr << ", offset: " << _used_blocks[k].offset << ", size " << bytes << " bytes" << std::endl;
+                // std::cout << "Free: address " << ptr << ", offset: " << _used_blocks[k].offset << ", size " << bytes << " bytes" << std::endl;
                 _used_blocks.erase(_used_blocks.begin() + k);
                 return;
             }
