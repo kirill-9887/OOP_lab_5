@@ -26,7 +26,7 @@ public:
 
 public:
 
-    typename StackType::item_type operator*() const {
+    const typename StackType::item_type& operator*() const {
         if (_current_index >= (*_stack_ptr).size()) {
             throw std::out_of_range("Stack iterator is out of range");
         }
